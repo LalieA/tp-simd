@@ -25,7 +25,7 @@
 #include "stdio.h"
 #include "utils.h"
 #include <x86intrin.h>
-#include <stdalign.h> 
+#include <stdalign.h>
 
 /* Fonction d'affichage de variables de __m128x sous divers formats */
 void p128_x(__m128 fl, __m128i in, __m128i sh, __m128i ch)
@@ -64,74 +64,75 @@ void YCrCb_to_ARGB(uint8_t *YCrCb_MCU[3], uint32_t *RGB_MCU, uint32_t nb_MCU_H, 
    /* On définit le tableau de zéro dont on va avoir besoin */
    /*
     * Instructions à utiliser
-    *     _mm_set... 
+    *     _mm_set1_epi32 
     */
-   const __m128i v0         = _mm_...(0);
+   const __m128i v0 = _mm_set1_epi32(0);
 
    MCU_Y  = YCrCb_MCU[0];
    MCU_Cb = YCrCb_MCU[1];
    MCU_Cr = YCrCb_MCU[2];
 
    for (i = 0; i < 8 * nb_MCU_V; i++) {
-      for (j = 0; j < 8 * nb_MCU_H; /* TODO: a ajuster, ... */) {
+      for (j = 0; j < 8 * nb_MCU_H; j+= 4) {
          /* On travaille à présent sur des vecteurs de 4 éléments d'un coup */
-         index = i * (8 * nb_MCU_H) + ...;
+         index = i * (8 * nb_MCU_H) + j;
 
          /*
           * Chargement des macro-blocs:
-          * instruction à utiliser
-          *     _mm_set...
+          *     _mm_set_ps
           */
-         Y  = _mm_...(MCU_Y [index + ...], ..., ..., ...);
-         Cb = _mm_...(MCU_Cb[index + ...], ..., ..., ...);
-         Cr = _mm_...(MCU_Cr[index + ...], ..., ..., ...);
+         Y  = _mm_set_ps(MCU_Y [index + 3], MCU_Y [index + 2], MCU_Y [index + 1], MCU_Y [index]);
+         Cr = _mm_set_ps(MCU_Cr[index + 3], MCU_Cr[index + 2], MCU_Cr[index + 1], MCU_Cr[index]);
+         Cb = _mm_set_ps(MCU_Cb[index + 3], MCU_Cb[index + 2], MCU_Cb[index + 1], MCU_Cb[index]);
 
          /*
           * Calcul de la conversion YCrCb vers RGB:
-          *    aucune instruction sse explicite
+          *    _mm_set_ss
+          *    _mm_mul_ss, _mm_sub_ps, _mm_add_ps
           */
-         Rf = ...;
-         Bf = ...;
-         Gf = ...;
-
+         Rf = (Cr - 128) * 1.402f + Y;
+         Gf = Y - (Cb - 128) * 0.381834f - (Cr - 128) * 0.71414f;
+         Bf = (Cb - 128) * 1.7772f + Y;
+      
          /*
           * Conversion en entier avec calcul de la saturation:
           * trois étapes :
           *    conversion vecteur flottants 32 bits vers vecteur entiers 32 bits
           *    conversion vecteur entiers 32 bits vers vecteur entiers 16 bits non signé en saturant
           *    conversion vecteur entiers 16 bits vers vecteur entiers 8 bits non signé en saturant
-          * instructions à utiliser
-          *    _mm_cvt...
-          *    _mm_pack...
+          *
+          *    _mm_cvtps_epi32
+          *    _mm_packus_epi32
+          *    _mm_packus_epi16
           */
-         R = ...
-         G = ...
-         B = ...
+         R = _mm_cvtps_epi32(Rf);
+         G = _mm_cvtps_epi32(Gf);
+         B = _mm_cvtps_epi32(Bf);
 
-         Rs = ...
-         Gs = ...
-         Bs = ...
+         Rs = _mm_packus_epi32(R, v0);
+         Gs = _mm_packus_epi32(G, v0);
+         Bs = _mm_packus_epi32(B, v0);
 
-         Rc = ...
-         Gc = ...
-         Bc = ...
+         Rc = _mm_packus_epi16(Rs, v0);
+         Gc = _mm_packus_epi16(Gs, v0);
+         Bc = _mm_packus_epi16(Bs, v0);
 
          /*
           * Transposition de la matrice d'octets, brillant !
           * instructions à utiliser
-          *    _mm_unpack...
+          *    _mm_unpacklo_epi8, _mm_unpacklo_epi16
           */
          __m128i tmp0, tmp1;
-         tmp0 = ...
-         tmp1 = ...
-         ARGB = ...
+         tmp0 = _mm_unpacklo_epi8(Rc, v0);
+         tmp1 = _mm_unpacklo_epi8(Bc, Gc);
+         ARGB = _mm_unpacklo_epi16(tmp1, tmp0);
 
          /*
           * Écriture du résultat en mémoire
           * instruction à utiliser
-          * _mm_store...
+          * _mm_store_si128
           */
-         _mm_store...
+         _mm_store_si128((__m128i *) &RGB_MCU[index], ARGB);
       }
    }
 }
