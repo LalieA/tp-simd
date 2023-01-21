@@ -5,6 +5,7 @@ L'objectif de ce TP est d'utiliser des opérations SIMD (Single Instruction, Mul
 ## Pré-requis
 
 L'exécution de ce TP nécessite d'avoir un processeur Intel x86_64 et la librarie SDL1.2 (ou SDL12-compat).
+La documentation des instructions SSE est disponible sur le site d'Intel : [Intel Intrinsics Guide](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#expand=undefined&techs=SSE_ALL)
 
 ## Compilation et exécution
 
